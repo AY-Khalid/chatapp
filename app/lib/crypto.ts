@@ -24,6 +24,11 @@ export function base64ToBuffer(base64: string): ArrayBuffer {
   return bytes.buffer;
 }
 
+// Helper function to convert ArrayBuffer to Uint8Array when needed
+function base64ToUint8Array(base64: string): Uint8Array {
+  return new Uint8Array(base64ToBuffer(base64));
+}
+
 /* =========================
    Key Generation
 ========================= */
@@ -51,10 +56,12 @@ export async function generateIdentityKeyPair(): Promise<{
 async function deriveWrappingKey(password: string, salt: Uint8Array): Promise<CryptoKey> {
   const enc = new TextEncoder();
   const baseKey = await window.crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveKey']);
+  
+  // Type assertion to fix the BufferSource type mismatch
   return window.crypto.subtle.deriveKey(
     {
       name: 'PBKDF2',
-      salt: salt as ArrayBufferView,
+      salt: salt as unknown as BufferSource,
       iterations: 100000,
       hash: 'SHA-256',
     },
@@ -91,27 +98,17 @@ export async function wrapPrivateKey(
   };
 }
 
-export async function unwrapPrivateKey(
-  wrappedPrivateKey: string,
-  salt: string,
-  password: string
-): Promise<CryptoKey> {
-  // ✅ Fix: convert ArrayBuffer → Uint8Array
-  const saltBytes = new Uint8Array(base64ToBuffer(salt));
-
-  const wrappingKey = await deriveWrappingKey(password, saltBytes);
-
+export async function unwrapPrivateKey(wrappedPrivateKey: string, salt: string, password: string): Promise<CryptoKey> {
+  // Convert the salt from base64 string to Uint8Array
+  const saltUint8Array = base64ToUint8Array(salt);
+  const wrappingKey = await deriveWrappingKey(password, saltUint8Array);
+  
   return window.crypto.subtle.unwrapKey(
     'pkcs8',
     base64ToBuffer(wrappedPrivateKey),
     wrappingKey,
     'AES-KW',
-    {
-      name: 'RSA-OAEP',
-      modulusLength: 2048,
-      publicExponent: new Uint8Array([1, 0, 1]),
-      hash: 'SHA-256',
-    },
+    { name: 'RSA-OAEP', hash: 'SHA-256' },
     true,
     ['decrypt', 'unwrapKey']
   );
