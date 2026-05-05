@@ -54,7 +54,7 @@ async function deriveWrappingKey(password: string, salt: Uint8Array): Promise<Cr
   return window.crypto.subtle.deriveKey(
     {
       name: 'PBKDF2',
-      salt: salt.buffer.slice(salt.byteOffset, salt.byteOffset + salt.byteLength) as ArrayBuffer,
+      salt: new Uint8Array(salt).buffer as ArrayBuffer,
       iterations: 100000,
       hash: 'SHA-256',
     },
