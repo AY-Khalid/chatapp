@@ -2,6 +2,7 @@
 
 ## Architecture
 
+[Architectural design](https://drive.google.com/file/d/1SE3yKzjM7vWU84YqKb98wnfvd9EsZYT2/view?usp=sharing)
 
 Frontend (Next.js) WhisperBox API (Koyeb) ├─ RSA-OAEP keypair generation
 ├─ Authentication (JWT + refresh tokens) ├─ AES-GCM message encryption
@@ -88,6 +89,7 @@ happens client-side - Keys are properly isolated - Messages remain
 encrypted at rest and in transit
 
 
+[live demo link](https://drive.google.com/file/d/1lkjar_3wkv5vKk1rg4ngQ7TsdwKzPpoI/view?usp=sharing)
 
 
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
