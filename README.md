@@ -1,6 +1,7 @@
-# WhisperBox --- End-to-End Encrypted Messaging
+# WhisperBox (ChatApp) --- End-to-End Encrypted Messaging
 
 ## Architecture
+
 
 Frontend (Next.js) WhisperBox API (Koyeb) ├─ RSA-OAEP keypair generation
 ├─ Authentication (JWT + refresh tokens) ├─ AES-GCM message encryption
