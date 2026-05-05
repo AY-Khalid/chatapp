@@ -50,20 +50,11 @@ export async function generateIdentityKeyPair(): Promise<{
 
 async function deriveWrappingKey(password: string, salt: Uint8Array): Promise<CryptoKey> {
   const enc = new TextEncoder();
-
-  const baseKey = await window.crypto.subtle.importKey(
-    'raw',
-    enc.encode(password),
-    'PBKDF2',
-    false,
-    ['deriveKey']
-  );
-
+  const baseKey = await window.crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveKey']);
   return window.crypto.subtle.deriveKey(
     {
       name: 'PBKDF2',
-      // ✅ Fix: ensure proper ArrayBuffer (no SharedArrayBuffer ambiguity)
-      salt: salt.buffer.slice(salt.byteOffset, salt.byteOffset + salt.byteLength),
+      salt: salt.buffer.slice(salt.byteOffset, salt.byteOffset + salt.byteLength) as ArrayBuffer,
       iterations: 100000,
       hash: 'SHA-256',
     },
