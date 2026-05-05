@@ -232,7 +232,8 @@ const REPLAY_WINDOW_MS = 5 * 60 * 1000;
 
 export async function decryptMessage(
   payload: EncryptedPayload,
-  privateKey: CryptoKey
+  privateKey: CryptoKey,
+  isSentByMe: boolean
 ): Promise<string> {
   async function tryUnwrap(keyData: string) {
     return window.crypto.subtle.unwrapKey(
