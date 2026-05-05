@@ -47,12 +47,11 @@ async function doRefresh(): Promise<string | null> {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ refresh_token: refreshToken }),
     });
-    if (!res.ok) throw new Error('Refresh failed');
-    const data: TokenResponse = await res.json();
+    if (!res.ok) return null;
+    const data = await res.json();
     setTokens(data.access_token, refreshToken);
     return data.access_token;
   } catch {
-    clearTokens();
     return null;
   }
 }
@@ -63,17 +62,22 @@ async function fetchApi(path: string, options: RequestInit = {}): Promise<any> {
     'Content-Type': 'application/json',
     ...(options.headers as Record<string, string> || {}),
   };
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
+  if (token) headers['Authorization'] = `Bearer ${token}`;
 
-  let res = await fetch(`${API_BASE}${path}`, { ...options, headers });
+  const url = `${API_BASE}${path}`;
+
+  let res: Response;
+  try {
+    res = await fetch(url, { ...options, headers });
+  } catch (e: any) {
+    throw new Error(`Network error: ${e.message}`);
+  }
 
   if (res.status === 401) {
     const newToken = await doRefresh();
     if (newToken) {
       headers['Authorization'] = `Bearer ${newToken}`;
-      res = await fetch(`${API_BASE}${path}`, { ...options, headers });
+      res = await fetch(url, { ...options, headers });
     }
   }
 
@@ -82,13 +86,32 @@ async function fetchApi(path: string, options: RequestInit = {}): Promise<any> {
     throw new Error('Unauthorized');
   }
 
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(text || `HTTP ${res.status}`);
+  // Safely get response body
+  let body: string;
+  try {
+    body = await res.text();
+  } catch {
+    body = '';
   }
 
-  if (res.status === 204) return null;
-  return res.json();
+  // Try to parse as JSON
+  let data: any;
+  try {
+    data = body ? JSON.parse(body) : null;
+  } catch {
+    // Not JSON — could be HTML error page
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}: ${body.slice(0, 100)}`);
+    }
+    throw new Error(`Expected JSON, got: ${body.slice(0, 100)}`);
+  }
+
+  if (!res.ok) {
+    const msg = data?.detail?.[0]?.msg || data?.detail || data?.message || `HTTP ${res.status}`;
+    throw new Error(msg);
+  }
+
+  return data;
 }
 
 export const api = {
@@ -131,9 +154,17 @@ export const api = {
     clearTokens();
   },
 
+//   getPublicKey: async (userId: string): Promise<UserPublicKey> => {
+//     return fetchApi(`/users/${userId}/public-key`);
+//   },
+
   getPublicKey: async (userId: string): Promise<UserPublicKey> => {
-    return fetchApi(`/users/${userId}/public-key`);
+    console.log('API: Fetching public key for', userId);
+    const res = await fetchApi(`/users/${userId}/public-key`);
+    console.log('RAW PUBLIC KEY RESPONSE:', res);
+    return res;
   },
+
 
   searchUsers: async (q: string): Promise<UserPublicInfo[]> => {
     return fetchApi(`/users/search?q=${encodeURIComponent(q)}`);

@@ -234,6 +234,7 @@ const selectedUser = conversations.find((c) => c.user_id === selectedUserId) ||
     return () => clearInterval(interval);
   }, [selectedUserId, wsConnected, handleIncomingMessage]);
 
+  
   const handleSend = async () => {
     if (!inputText.trim() || !selectedUserId || !user) return;
 

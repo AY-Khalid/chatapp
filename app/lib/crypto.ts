@@ -9,14 +9,18 @@ function bufferToBase64(buffer: ArrayBuffer | Uint8Array): string {
   return window.btoa(binary);
 }
 
-export function base64ToBuffer(base64: string): Uint8Array {
+
+export function base64ToBuffer(base64: string): ArrayBuffer {
   const binary = window.atob(base64);
   const bytes = new Uint8Array(binary.length);
+
   for (let i = 0; i < binary.length; i++) {
     bytes[i] = binary.charCodeAt(i);
   }
-  return bytes;
+
+  return bytes.buffer;
 }
+
 
 // Generate RSA-OAEP 2048-bit keypair
 export async function generateIdentityKeyPair(): Promise<{ publicKey: CryptoKey; privateKey: CryptoKey }> {
@@ -82,17 +86,44 @@ export async function exportPublicKey(key: CryptoKey): Promise<string> {
   return bufferToBase64(new TextEncoder().encode(JSON.stringify(jwk)));
 }
 
-// Import public key from base64-encoded JWK
-export async function importPublicKey(base64Jwk: string): Promise<CryptoKey> {
-  const jwk = JSON.parse(new TextDecoder().decode(base64ToBuffer(base64Jwk)));
-  return window.crypto.subtle.importKey(
-    'jwk',
-    jwk,
-    { name: 'RSA-OAEP', hash: 'SHA-256' },
-    false,
-    ['wrapKey']
-  );
+
+
+export async function importPublicKey(input: string): Promise<CryptoKey> {
+  try {
+    // Case 1: Try JWK base64(JSON)
+    const decoded = new TextDecoder().decode(base64ToBuffer(input));
+    const jwk = JSON.parse(decoded);
+
+    if (jwk && jwk.kty) {
+      return window.crypto.subtle.importKey(
+        'jwk',
+        jwk,
+        { name: 'RSA-OAEP', hash: 'SHA-256' },
+        false,
+        ['wrapKey']
+      );
+    }
+  } catch {}
+
+  try {
+    // Case 2: Try SPKI raw base64 (most likely your working case)
+    const binary = base64ToBuffer(input);
+
+    return window.crypto.subtle.importKey(
+      'spki',
+      binary,
+      {
+        name: 'RSA-OAEP',
+        hash: 'SHA-256',
+      },
+      false,
+      ['wrapKey']
+    );
+  } catch (e) {
+    throw new Error('Unsupported public key format');
+  }
 }
+
 
 // Encrypt a message: random AES-GCM key, wrapped with RSA-OAEP for both recipient and sender
 export async function encryptMessage(
@@ -168,11 +199,30 @@ if (!aesKey) {
   throw new Error('Unable to unwrap AES key');
 }
 
-  const decrypted = await window.crypto.subtle.decrypt(
-    { name: 'AES-GCM', iv: base64ToBuffer(payload.iv) as ArrayBufferView },
+  // const decrypted = await window.crypto.subtle.decrypt(
+  //   { name: 'AES-GCM', iv: base64ToBuffer(payload.iv) as ArrayBufferView },
+  //   aesKey,
+  //   base64ToBuffer(payload.ciphertext)
+  // );
+
+  let decrypted: ArrayBuffer;
+
+try {
+  // New format (ArrayBuffer)
+  decrypted = await window.crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv: new Uint8Array(base64ToBuffer(payload.iv)) },
     aesKey,
     base64ToBuffer(payload.ciphertext)
   );
+} catch {
+  // Fallback for old messages
+  decrypted = await window.crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv: base64ToBuffer(payload.iv) as any },
+    aesKey,
+    new Uint8Array(base64ToBuffer(payload.ciphertext))
+  );
+}
+
 
   const data = JSON.parse(new TextDecoder().decode(decrypted));
 
